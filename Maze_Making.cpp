@@ -141,7 +141,10 @@ void Maze_Making::random_prim_make_maze( const int &types ) {
     set_begin_point( seed_y, seed_x, re_load );
     std::deque<std::pair<int, int>> wall;    //待找的牆的列表
     std::vector<int> direction_order{ 0, 1, 2, 3 };
-    std::random_shuffle( direction_order.begin(), direction_order.end() );
+    std::random_device rd;
+    std::mt19937 g( rd() );
+    std::shuffle( direction_order.begin(), direction_order.end(), g );
+
     for ( const int &index : direction_order ) {
         const auto &[dir_y, dir_x] = directions[index];
         if ( if_in_wall( seed_y, seed_x, dir_y, dir_x ) )
@@ -149,18 +152,18 @@ void Maze_Making::random_prim_make_maze( const int &types ) {
     }
 
     int random_index;    //要打通的牆的index，隨機找
-    int up_node, down_node, left_node, right_node;    //目前這個牆的上下左右結點
+    int up_node{ -1 }, down_node{ -1 }, left_node{ -1 }, right_node{ -1 };    //目前這個牆的上下左右結點
     std::deque<std::pair<int, int>> confirm_wall;    //確認是牆壁的列表
     while ( !wall.empty() ) {
         random_index = rand() % wall.size();
         int temp_y = wall.at( random_index ).first, temp_x = wall.at( random_index ).second;
 
         // 將四周點加進deque裡的函式
-        auto Pushing_Wall = [&temp_y, &temp_x, &re_load, &wall, &direction_order, this]() {
+        auto Pushing_Wall = [&temp_y, &temp_x, &re_load, &wall, &direction_order, &g, this]() {
             maze[temp_y][temp_x] = static_cast<int>( Maze_Elements::EXPLORED );    //將現在的節點(牆壁上下左右其中一個，看哪個方向符合條件) 改為 EXPLORED
             Buffer_Node.first = temp_y, Buffer_Node.second = temp_x;
             re_load.emplace_back( std::make_pair( temp_y, temp_x ) );    //將這個節點的座標記起來，等等要改回 GROUND
-            std::random_shuffle( direction_order.begin(), direction_order.end() );
+            std::shuffle( direction_order.begin(), direction_order.end(), g );
             for ( const int &index : direction_order ) {    //(新的點的)上下左右遍歷
                 const auto &[dir_y, dir_x] = directions[index];
                 if ( if_in_wall( temp_y, temp_x, dir_y, dir_x ) ) {    //如果上(下左右)的牆在迷宮內
@@ -244,16 +247,19 @@ void Maze_Making::recursion_make_maze() {
     int seed_y{}, seed_x{};    //一開始 x,y 座標
     set_begin_point( seed_y, seed_x, re_load );
     std::srand( std::chrono::system_clock::now().time_since_epoch().count() );    //設定隨機數種子
+    std::random_device rd;
+    std::mt19937 g( rd() );
 
     struct Node {
         int y, x, current_index;
         std::vector<int> walking_order{ 0, 1, 2, 3 };
-        Node( int __y, int __x, int __current_index ) : y( __y ), x( __x ), current_index( __current_index ) {
-            std::random_shuffle( walking_order.begin(), walking_order.end() );
+        Node( int __y, int __x, int __current_index, std::mt19937 &g ) : y( __y ), x( __x ), current_index( __current_index ) {
+
+            std::shuffle( walking_order.begin(), walking_order.end(), g );
         };
     };
     std::stack<Node> Walking_List;
-    Node first_node( seed_y, seed_x, 0 );
+    Node first_node( seed_y, seed_x, 0, g );
     Walking_List.emplace( first_node );
 
     while ( !Walking_List.empty() ) {
@@ -265,7 +271,7 @@ void Maze_Making::recursion_make_maze() {
                 ++Walking_List.top().current_index;
                 if ( Walking_List.top().current_index > 3 )
                     Walking_List.pop();
-                Walking_List.emplace( Node( temp.y + 2 * dir_y, temp.x + 2 * dir_x, 0 ) );
+                Walking_List.emplace( Node( temp.y + 2 * dir_y, temp.x + 2 * dir_x, 0, g ) );
 
                 maze[temp.y + dir_y][temp.x + dir_x] = static_cast<int>( Maze_Elements::EXPLORED );
                 re_load.emplace_back( std::make_pair( temp.y + dir_y, temp.x + dir_x ) );
